@@ -1126,6 +1126,16 @@ static aom_codec_err_t ctrl_set_cq_level(aom_codec_alg_priv_t *ctx,
                                          va_list args) {
   struct av1_extracfg extra_cfg = ctx->extra_cfg;
   extra_cfg.cq_level = CAST(AOME_SET_CQ_LEVEL, args);
+  static int flag = 0;
+  if (flag == 0) {
+	  FILE* pFile = fopen("beta-values.txt", "a");
+	  fprintf(pFile, ": %u\n", extra_cfg.cq_level);
+	  fclose(pFile);
+	  pFile = fopen("base-qindex.txt", "a");
+	  fprintf(pFile, ": %u\n", extra_cfg.cq_level);
+	  fclose(pFile);
+	  flag = 1;
+  }
   return update_extra_cfg(ctx, &extra_cfg);
 }
 

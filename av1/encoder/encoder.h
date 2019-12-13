@@ -57,6 +57,9 @@
 extern "C" {
 #endif
 
+#define TURN_QPM_OFF_BASE_LAYER 0 // Colin
+#define TURN_QPM_OFF_NON_BASE_LAYER 1
+
 // Rational number with an int64 numerator
 // This structure holds a fractional value
 typedef struct aom_rational64 {

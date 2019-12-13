@@ -1241,12 +1241,41 @@ static void parse_global_config(struct AvxEncoderConfig *global, char ***argv) {
   }
 }
 
+char *getFileName(char *path) {
+	char *retVal = path;
+	char *p;
+	for (p = path; *p; p++) {
+		if (*p == '/' || *p == '\\' || *p == ':') {
+			retVal = p;
+		}
+	}
+	return retVal+1;
+}
+
 static void open_input_file(struct AvxInputContext *input,
                             aom_chroma_sample_position_t csp) {
   /* Parse certain options from the input file, if possible */
   input->file = strcmp(input->filename, "-") ? fopen(input->filename, "rb")
                                              : set_binary_mode(stdin);
 
+  static int flag = 0;
+  if (flag == 0) {
+	  char* temp = getFileName(input->filename);
+	  int size = 0;
+	  while (temp[size] != '\0') size++;
+	  char* basename = malloc(sizeof(char)* size);
+	  strncpy(basename, temp, size);
+
+	  basename[size - 4] = '\0'; // strip away ".yuv"
+	  FILE* pFile = fopen("beta-values.txt", "a");
+	  fprintf(pFile, "%s", basename);
+	  fclose(pFile);
+	  pFile = fopen("base-qindex.txt", "a");
+	  fprintf(pFile, "%s", basename);
+	  fclose(pFile);
+	  flag = 1;
+  }
+  
   if (!input->file) fatal("Failed to open input file");
 
   if (!fseeko(input->file, 0, SEEK_END)) {

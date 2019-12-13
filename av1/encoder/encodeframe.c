@@ -3870,7 +3870,37 @@ static int get_q_for_deltaq_objective(AV1_COMP *const cpi, BLOCK_SIZE bsize,
   if (mc_dep_cost > 0 && intra_cost > 0) {
     const double r0 = cpi->rd.r0;
     const double rk = (double)intra_cost / mc_dep_cost;
-    beta = (r0 / rk);
+    beta = (r0 / rk); // frame cost / block cost
+
+
+	FILE* pFile = fopen("beta-values.txt", "a");
+	fprintf(pFile, "%f\n", beta);
+	fclose(pFile);
+
+	static int frame_0_flag = 0; 
+	static int frame_16_flag = 0;
+	static int frame_32_flag = 0;
+	static int frame_48_flag = 0;
+
+	pFile = fopen("base-qindex.txt", "a");
+	if (cm->current_frame.order_hint == 0 && frame_0_flag == 0) {
+		fprintf(pFile, "%d\n", cm->base_qindex);
+		frame_0_flag = 1;
+	}
+	if (cm->current_frame.order_hint == 16 && frame_16_flag == 0) {
+		fprintf(pFile, "%d\n", cm->base_qindex);
+		frame_16_flag = 1;
+	}
+	if (cm->current_frame.order_hint == 32 && frame_32_flag == 0) {
+		fprintf(pFile, "%d\n", cm->base_qindex);
+		frame_32_flag = 1;
+	}
+	if (cm->current_frame.order_hint == 48 && frame_48_flag == 0) {
+		fprintf(pFile, "%d\n", cm->base_qindex);
+		frame_48_flag = 1;
+	}
+	fclose(pFile);
+
     assert(beta > 0.0);
   }
   offset = av1_get_deltaq_offset(cpi, cm->base_qindex, beta);
@@ -3938,7 +3968,6 @@ static AOM_INLINE void setup_delta_q(AV1_COMP *const cpi, ThreadData *td,
   current_qindex = xd->current_qindex + sign_deltaq_index * abs_deltaq_index;
   current_qindex = AOMMAX(current_qindex, MINQ + 1);
   assert(current_qindex > 0);
-
   xd->delta_qindex = current_qindex - cm->base_qindex;
   set_offsets(cpi, tile_info, x, mi_row, mi_col, sb_size);
   xd->mi[0]->current_qindex = current_qindex;
@@ -4312,6 +4341,11 @@ static AOM_INLINE void encode_sb_row(AV1_COMP *cpi, ThreadData *td,
 
     x->sb_energy_level = 0;
 #if !CONFIG_REALTIME_ONLY
+
+	unsigned int frame_number = cm->current_frame.order_hint;
+	if (frame_number != 0 && frame_number != 16 && frame_number != 32 && frame_number != 48)
+		cm->delta_q_info.delta_q_present_flag = 0;
+
     if (cm->delta_q_info.delta_q_present_flag) {
       setup_delta_q(cpi, td, x, tile_info, mi_row, mi_col, num_planes);
       av1_tpl_rdmult_setup_sb(cpi, x, sb_size, mi_row, mi_col);
