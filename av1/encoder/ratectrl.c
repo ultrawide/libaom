@@ -886,7 +886,7 @@ static int get_active_cq_level(const RATE_CONTROL *rc,
   }
   return active_cq_level;
 }
-
+#define ADAPTIVE_QPS_OFF        1
 static int rc_pick_q_and_bounds_one_pass_vbr(const AV1_COMP *cpi, int width,
                                              int height, int *bottom_index,
                                              int *top_index) {
@@ -953,11 +953,19 @@ static int rc_pick_q_and_bounds_one_pass_vbr(const AV1_COMP *cpi, int width,
     } else if (oxcf->rc_mode == AOM_Q) {
       const int qindex = cq_level;
       const double q_val = av1_convert_qindex_to_q(qindex, bit_depth);
+#if ADAPTIVE_QPS_OFF
+         const int delta_qindex = cm->current_frame.order_hint < 49 ? av1_compute_qdelta(rc, q_val, q_val * 0.35, bit_depth) : av1_compute_qdelta(rc, q_val, q_val * 0.4, bit_depth);
+          //(cpi->refresh_alt_ref_frame)
+               //? av1_compute_qdelta(rc, q_val, q_val * 0.40, bit_depth)
+               //: av1_compute_qdelta(rc, q_val, q_val * 0.50, bit_depth);
+          active_best_quality = AOMMAX(qindex + delta_qindex, rc->best_quality);
+#else
       const int delta_qindex =
           (cpi->refresh_alt_ref_frame)
               ? av1_compute_qdelta(rc, q_val, q_val * 0.40, bit_depth)
               : av1_compute_qdelta(rc, q_val, q_val * 0.50, bit_depth);
       active_best_quality = AOMMAX(qindex + delta_qindex, rc->best_quality);
+#endif
     } else {
       active_best_quality = get_gf_active_quality(rc, q, bit_depth);
     }
@@ -1321,6 +1329,19 @@ static int get_active_best_quality(const AV1_COMP *const cpi,
   const int min_boost = get_gf_high_motion_quality(q, bit_depth);
   const int boost = min_boost - active_best_quality;
   active_best_quality = min_boost - (int)(boost * rc->arf_boost_factor);
+#if ADAPTIVE_QPS_OFF
+  if (cm->current_frame.order_hint % 16 == 0) {
+      const int bit_depth = cm->seq_params.bit_depth;
+      const int qindex = cq_level;
+      double q_val = av1_convert_qindex_to_q(qindex, bit_depth);
+      const int delta_qindex = cm->current_frame.order_hint < 49 ? av1_compute_qdelta(rc, q_val, q_val * 0.35, bit_depth) : av1_compute_qdelta(rc, q_val, q_val * 0.4, bit_depth);
+      //(cpi->refresh_alt_ref_frame)
+           //? av1_compute_qdelta(rc, q_val, q_val * 0.40, bit_depth)
+           //: av1_compute_qdelta(rc, q_val, q_val * 0.50, bit_depth);
+      active_best_quality = AOMMAX(qindex + delta_qindex, rc->best_quality);
+  }
+#endif
+
   if (!is_intrl_arf_boost) return active_best_quality;
 
   if (rc_mode == AOM_Q || rc_mode == AOM_CQ) active_best_quality = rc->arf_q;
@@ -1353,6 +1374,14 @@ static int rc_pick_q_and_bounds_two_pass(const AV1_COMP *cpi, int width,
         cm->current_frame.frame_type == KEY_FRAME && cm->show_frame == 0;
     get_intra_q_and_bounds_two_pass(cpi, width, height, &active_best_quality,
                                     &active_worst_quality, cq_level, is_fwd_kf);
+#if ADAPTIVE_QPS_OFF
+    const int bit_depth = cm->seq_params.bit_depth;
+    const int qindex = cq_level;
+    double q_val = av1_convert_qindex_to_q(qindex, bit_depth);
+    int delta_qindex =
+    av1_compute_qdelta(rc, q_val, q_val * 0.25, bit_depth);
+    active_best_quality = AOMMAX(qindex + delta_qindex, rc->best_quality);
+#endif
   } else {
     active_best_quality =
         get_active_best_quality(cpi, active_worst_quality, cq_level, gf_index);
